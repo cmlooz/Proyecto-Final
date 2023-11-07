@@ -1,0 +1,51 @@
+version: '0.0.1'
+services:
+  postgresql-server-service:
+    image: postgres:latest
+    environment:
+      POSTGRES_PASSWORD: "HDLCrin8*"
+      POSTGRES_DB: "courses_db"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+  ms-sql-server-service: 
+    image: mcr.microsoft.com/mssql/server:2017-latest-ubuntu
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "HDLCrin8*"
+      MSSQL_PID: Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - ms-sql-data:/var/lib/ms-sql/data
+  nodejs-courses-api-service:
+    image: jcortizs/nodejs_courses_api
+    build: .
+    environment:
+      POSTGRES_HOST: "postgresql-server"
+      POSTGRES_PORT: "5432"
+      POSTGRES_USERNAME: "postgres"
+      POSTGRES_PASSWORD: "HDLCrin8*"
+      POSTGRES_DATABASE: "courses_db"
+    ports:
+      - "8090:80"
+  dotnet-resources-api-service:
+    image: jcortizs/dotnet_resources_api
+    build: .
+    environment:
+      DBServer: "ms-sql-server"
+      ConnectionStrings__DefaultConnection: "Server=tcp:localhost,1433;Database=resources_db;Trusted_Connection=False;TrustServerCertificate=True;MultipleActiveResultSets=true;User ID=sa;Password=HDLCrin8*;"
+    ports:
+      - "8080:80"
+  django-gateway-api-service:
+    image: jcortizs/django_gateway_api
+    ports:
+      - "8070:80"
+      - "1544:1544"
+      - "8080:8080"
+      - "8090:8090"
+      - "8060:8060"
+volumes:
+  postgresql-data:
+  ms-sql-data:

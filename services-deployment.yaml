@@ -1,32 +1,10 @@
-#DATABASES CONTAINERS
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: postgresql-server-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ms-sql-server-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+#SERVICES RESOURCES
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nodejs-courses-api-deployment
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: nodejs-courses-api
@@ -36,23 +14,11 @@ spec:
         app: nodejs-courses-api
     spec:
       containers:
-        - name: postgresql-server-api-container
-          image: postgres:latest
-          env:
-            - name: POSTGRES_PASSWORD
-              value: "HDLCrin8*"
-            - name: POSTGRES_DATABASE
-              value: "courses_db"
-          ports:
-            - containerPort: 5432
-          volumeMounts:
-            - name: postgresql-server-pvolume
-              mountPath: /var/lib/postgresql/data
         - name: nodejs-courses-api-container
           image: jcortizs/nodejs_courses_api
           env:
             - name: POSTGRES_HOST
-              value: "localhost"
+              value: "postgresql-server-service"
             - name: POSTGRES_PORT
               value: "5432"
             - name: POSTGRES_USERNAME
@@ -66,17 +32,30 @@ spec:
           ports:
             - containerPort: 8090
             - containerPort: 5432
-      volumes:
-        - name: postgresql-server-pvolume
-          persistentVolumeClaim:
-            claimName: postgresql-server-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-courses-api-service
+spec:
+  selector:
+    app: nodejs-courses-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8090
+      targetPort: 8090
+    - name: database
+      protocol: TCP
+      port: 5432
+      targetPort: 5432
+  type: LoadBalancer
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: dotnet-resources-api-deployment
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: dotnet-resources-api
@@ -86,40 +65,42 @@ spec:
         app: dotnet-resources-api
     spec:
       containers:
-        - name: ms-sql-server-container
-          image: mcr.microsoft.com/mssql/server:2017-latest-ubuntu
-          env:
-            - name: ACCEPT_EULA
-              value: "Y"
-            - name: SA_PASSWORD
-              value: "HDLCrin8*"
-            - name: MSSQL_PID
-              value: Express
-          ports:
-            - containerPort: 1433
         - name: dotnet-resources-api-container
           image: jcortizs/dotnet_resources_api
           env:
             - name: DBServer
-              value: localhost
+              value: ms-sql-server-service
             #- name: ms-sql-server
             #  value: "ms-sql-server-service"
             - name: ConnectionStrings__DefaultConnection
-              value: "Server=tcp:localhost,1433;Database=resources_db;Trusted_Connection=False;TrustServerCertificate=True;MultipleActiveResultSets=true;User ID=sa;Password=HDLCrin8*;"
+              value: "Server=tcp:ms-sql-server-service,1433;Database=resources_db;Trusted_Connection=False;TrustServerCertificate=True;MultipleActiveResultSets=true;User ID=sa;Password=HDLCrin8*;"
           ports:
             - containerPort: 8080
             - containerPort: 1433
-      volumes:
-        - name: ms-sql-server-pvolume
-          persistentVolumeClaim:
-            claimName: ms-sql-server-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dotnet-resources-api-service
+spec:
+  selector:
+    app: dotnet-resources-api
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+    - name: database
+      protocol: TCP
+      port: 1433
+      targetPort: 1433
+  type: LoadBalancer
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: django-gateway-api-deployment
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: django-gateway-api
@@ -141,46 +122,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: nodejs-courses-api-service
-spec:
-  selector:
-    app: nodejs-courses-api
-  ports:
-    - name: http
-      protocol: TCP
-      port: 8090
-      targetPort: 8090
-    - name: port-1544
-      protocol: TCP
-      port: 5432
-      targetPort: 5432
-  type: LoadBalancer
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: dotnet-resources-api-service
-spec:
-  selector:
-    app: dotnet-resources-api
-  ports:
-    - name: http
-      protocol: TCP
-      port: 8080
-      targetPort: 8080
-    - name: port-1544
-      protocol: TCP
-      port: 1433
-      targetPort: 1433
-  type: LoadBalancer
----
-apiVersion: v1
-kind: Service
-metadata:
   name: django-gateway-api-service
 spec:
   selector:
     app: django-gateway-api
+  #  ports:
+  #    - protocol: TCP
+  #      port: 8070
+  #      targetPort: 80
   ports:
     - name: http
       protocol: TCP

@@ -1,0 +1,126 @@
+#DATABASES CONTAINERS
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-server-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ms-sql-server-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql-server-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql-server
+  template:
+    metadata:
+      labels:
+        app: postgresql-server
+    spec:
+      #initContainers:
+      #  - name: init-db
+      #    image: postgres:latest
+      #    env:
+      #      - name: POSTGRES_PASSWORD
+      #        value: "HDLCrin8*"
+      #    command:
+      #      [
+      #        "sh",
+      #        "-c",
+      #        "until pg_isready -h postgresql-server; do echo waiting for database; sleep 2; done; psql -h postgresql-server -U postgres -c 'CREATE DATABASE courses_db;'",
+      #      ]
+      #    ports:
+      #      - containerPort: 5432
+      containers:
+        - name: postgresql-server-container
+          image: postgres:latest
+          env:
+            - name: POSTGRES_PASSWORD
+              value: "HDLCrin8*"
+            - name: POSTGRES_DATABASE
+              value: "courses_db"
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgresql-server-pvolume
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgresql-server-pvolume
+          persistentVolumeClaim:
+            claimName: postgresql-server-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-server-service
+spec:
+  selector:
+    app: postgresql-server
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+      #nodePort: 5432
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ms-sql-server-deployment
+spec:
+  selector:
+    matchLabels:
+      app: ms-sql-server
+  template:
+    metadata:
+      labels:
+        app: ms-sql-server
+    spec:
+      containers:
+        - name: ms-sql-server-container
+          image: mcr.microsoft.com/mssql/server:2017-latest-ubuntu
+          env:
+            - name: ACCEPT_EULA
+              value: "Y"
+            - name: SA_PASSWORD
+              value: "HDLCrin8*"
+            - name: MSSQL_PID
+              value: Express
+          ports:
+            - containerPort: 1433
+      volumes:
+        - name: ms-sql-server-pvolume
+          persistentVolumeClaim:
+            claimName: ms-sql-server-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ms-sql-server-service
+spec:
+  selector:
+    app: ms-sql-server
+  ports:
+    - protocol: TCP
+      port: 1433
+      targetPort: 1433
+      #nodePort: 1433
+  type: LoadBalancer
