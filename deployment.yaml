@@ -21,6 +21,17 @@ spec:
     requests:
       storage: 1Gi
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sqlite3-server-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,13 +70,10 @@ spec:
               value: "postgres"
             - name: POSTGRES_PASSWORD
               value: "HDLCrin8*"
-            #- name: postgresql-server
-            #  value: postgresql-server-service
             - name: POSTGRES_DATABASE
               value: "courses_db"
           ports:
             - containerPort: 8090
-            - containerPort: 5432
       volumes:
         - name: postgresql-server-pvolume
           persistentVolumeClaim:
@@ -102,13 +110,10 @@ spec:
           env:
             - name: DBServer
               value: localhost
-            #- name: ms-sql-server
-            #  value: "ms-sql-server-service"
             - name: ConnectionStrings__DefaultConnection
               value: "Server=tcp:localhost,1433;Database=resources_db;Trusted_Connection=False;TrustServerCertificate=True;MultipleActiveResultSets=true;User ID=sa;Password=HDLCrin8*;"
           ports:
-            - containerPort: 8080
-            - containerPort: 1433
+            - containerPort: 80
       volumes:
         - name: ms-sql-server-pvolume
           persistentVolumeClaim:
@@ -119,7 +124,6 @@ kind: Deployment
 metadata:
   name: django-gateway-api-deployment
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app: django-gateway-api
@@ -133,10 +137,13 @@ spec:
           image: jcortizs/django_gateway_api
           ports:
             - containerPort: 8070
-            - containerPort: 1544
-            - containerPort: 8080
-            - containerPort: 8090
-            - containerPort: 8060
+          volumeMounts:
+            - name: sqlite3-server-pvolume
+              mountPath: /var/lib/sqlite3/data
+      volumes:
+        - name: sqlite3-server-pvolume
+          persistentVolumeClaim:
+            claimName: sqlite3-server-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -150,10 +157,6 @@ spec:
       protocol: TCP
       port: 8090
       targetPort: 8090
-    - name: port-1544
-      protocol: TCP
-      port: 5432
-      targetPort: 5432
   type: LoadBalancer
 ---
 apiVersion: v1
@@ -167,11 +170,7 @@ spec:
     - name: http
       protocol: TCP
       port: 8080
-      targetPort: 8080
-    - name: port-1544
-      protocol: TCP
-      port: 1433
-      targetPort: 1433
+      targetPort: 80
   type: LoadBalancer
 ---
 apiVersion: v1
@@ -186,10 +185,6 @@ spec:
       protocol: TCP
       port: 8070
       targetPort: 8070
-    - name: port-1544
-      protocol: TCP
-      port: 1544
-      targetPort: 1544
     - name: dotnet-resources-api-port
       protocol: TCP
       port: 8080
